@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>QUIFT</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg:        #C1cdcd;
+      --accent:    #ADFF2F;
+      --circle:    #838b8b;
+      --circle-hi: #9ba2a2;
+      --circle-lo: #6f7676;
+      --circle-size: clamp(150px, 27vmin, 320px);
+    }
+
+    *{ margin:0; padding:0; box-sizing:border-box; }
+    html, body{ height:auto; }
+    html{ overflow-x:hidden; }
+
+    body{
+      min-height:300vh;
+      min-height:300dvh;                /* iOS/Android: passt sich an Browser-Chrome an */
+      background:
+        radial-gradient(circle at 50% 44%, #cdd7d7 0%, var(--bg) 58%, #b6c3c3 100%);
+      background-attachment:fixed;
+      color:var(--accent);
+      font-family:'Syne', sans-serif;
+      overflow-x:hidden;
+      position:relative;
+    }
+
+    /* Feine Körnung für etwas Atmosphäre */
+    body::after{
+      content:""; position:fixed; inset:0; pointer-events:none;
+      opacity:.04; mix-blend-mode:multiply; z-index:1;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    /* ---------- Header (transparent) ---------- */
+    header{
+      position:fixed; top:0; left:0; width:100%;
+      display:flex; justify-content:center; align-items:center;
+      padding:clamp(20px, 4vh, 42px) 16px;
+      background:transparent; z-index:40;
+    }
+    .wordmark{
+      font-weight:800; font-size:clamp(1.5rem, 3.4vw, 2.4rem);
+      letter-spacing:.42em; text-indent:.42em; text-transform:uppercase;
+      color:var(--accent); text-shadow:0 1px 0 rgba(74,94,74,.18);
+      user-select:none; animation:wordmarkIn 1s ease .25s both;
+    }
+    @keyframes wordmarkIn{
+      from{ opacity:0; letter-spacing:.62em; transform:translateY(-6px); }
+      to  { opacity:1; letter-spacing:.42em; transform:translateY(0); }
+    }
+
+    /* ---------- Bühne (bleibt beim Scrollen fest in der Mitte) ---------- */
+    .scene{
+      position:fixed; top:0; left:0; width:100vw; height:100vh;
+      height:100dvh;
+      overflow:hidden; z-index:5; pointer-events:none;
+    }
+
+    /* Kreis / Münze */
+    .split{
+      position:absolute; top:50%; left:50%;
+      width:var(--circle-size); height:var(--circle-size);
+      transform:translate(-50%,-50%);
+      perspective:1400px;
+      z-index:2;
+    }
+    .tilt{ width:100%; height:100%; transform:rotateX(14deg); transform-style:preserve-3d; }
+    .drop{
+      width:100%; height:100%; transform-style:preserve-3d;
+      transform:scale(3.4); opacity:0; filter:blur(10px);
+      animation:coreDrop 1.15s cubic-bezier(.2,.8,.2,1) forwards;
+    }
+    @keyframes coreDrop{
+      0%   { transform:scale(3.4); opacity:0;   filter:blur(10px); }
+      55%  { opacity:1; }
+      82%  { transform:scale(.94); filter:blur(0); }
+      100% { transform:scale(1);   opacity:1; filter:blur(0); }
+    }
+    .coin{ position:relative; width:100%; height:100%; transform-style:preserve-3d; }
+    .face{ position:absolute; inset:0; border-radius:50%; backface-visibility:hidden; }
+    .face.front{
+      background:radial-gradient(circle at 38% 32%, var(--circle-hi) 0%, var(--circle) 52%, var(--circle-lo) 100%);
+      box-shadow:0 24px 60px rgba(70,80,80,.35), inset 0 0 40px rgba(255,255,255,.06);
+    }
+    .face.back{
+      background:radial-gradient(circle at 38% 32%, #c9ff86 0%, var(--accent) 55%, #8fdc1f 100%);
+      box-shadow:0 24px 60px rgba(120,150,40,.35), inset 0 0 40px rgba(255,255,255,.12);
+      transform:rotateY(180deg);
+    }
+
+    /* Bodenschatten */
+    .shadow{
+      position:absolute; top:calc(50% + var(--circle-size)*.46); left:50%;
+      width:calc(var(--circle-size)*.78); height:calc(var(--circle-size)*.14);
+      transform:translate(-50%,-50%) scaleX(.2);
+      border-radius:50%; background:rgba(70,80,80,.30); filter:blur(14px);
+      opacity:0; z-index:0; animation:shadowIn .5s ease 1.0s forwards;
+    }
+    @keyframes shadowIn{ from{ transform:translate(-50%,-50%) scaleX(.2); opacity:0; } to{ transform:translate(-50%,-50%) scaleX(1); opacity:1; } }
+
+    /* ---------- Aufprall-Ringe (nur beim Auftreffen) ---------- */
+    .ring{
+      position:absolute; top:50%; left:50%;
+      width:var(--circle-size); height:var(--circle-size);
+      border-radius:50%; border:3px solid var(--accent);
+      transform:translate(-50%,-50%) scale(.6); opacity:0;
+      z-index:1; pointer-events:none;
+    }
+    @keyframes ripple{
+      0%   { transform:translate(-50%,-50%) scale(.6);  opacity:0; }
+      12%  { opacity:.9; }
+      100% { transform:translate(-50%,-50%) scale(2.9); opacity:0; }
+    }
+    .ring.b1{ border-width:4px;   animation:ripple 1.7s ease-out 1.00s forwards; }
+    .ring.b2{ border-width:3.5px; animation:ripple 1.7s ease-out 1.18s forwards; }
+    .ring.b3{ border-width:3px;   animation:ripple 1.7s ease-out 1.36s forwards; }
+
+    /* ---------- Wasser-Wellen (graue Ripples, nur beim Aufprall) ---------- */
+    .wave{
+      position:absolute; top:50%; left:50%;
+      width:var(--circle-size); height:var(--circle-size);
+      border-radius:50%;
+      transform:translate(-50%,-50%) scale(.55);
+      opacity:0;
+      z-index:0; pointer-events:none;
+      /* Wellen-Band: dunkler Kamm + heller Saum + weicher Schein */
+      border:2px solid rgba(95,105,105,.32);
+      box-shadow:
+        0 0 0 3px rgba(205,215,215,.22),
+        0 0 0 6px rgba(95,105,105,.14),
+        0 0 22px 6px rgba(85,95,95,.10);
+      filter:blur(.6px);
+    }
+    @keyframes waveOut{
+      0%   { transform:translate(-50%,-50%) scale(.55); opacity:0; }
+      12%  { opacity:.85; }
+      55%  { opacity:.55; }
+      100% { transform:translate(-50%,-50%) scale(6.8);  opacity:0; }
+    }
+    .wave.w1{ animation:waveOut 2.4s cubic-bezier(.2,.7,.2,1) 0.95s forwards; }
+    .wave.w2{ animation:waveOut 2.7s cubic-bezier(.2,.7,.2,1) 1.10s forwards; }
+    .wave.w3{ animation:waveOut 3.0s cubic-bezier(.2,.7,.2,1) 1.28s forwards; }
+    .wave.w4{ animation:waveOut 3.3s cubic-bezier(.2,.7,.2,1) 1.48s forwards; }
+
+    /* ---------- "Coming Soon" zwischen den Hälften ---------- */
+    .cs{
+      position:absolute; top:50%; left:50%;
+      font-family:'Syne', sans-serif;
+      font-weight:800;
+      font-size:clamp(1.7rem, 5.5vw, 4.7rem);   /* 15% kleiner */
+      letter-spacing:.42em;                      /* wie Header */
+      text-indent:.42em;                         /* gleicht Tracking optisch aus */
+      text-transform:uppercase;
+      color:var(--accent);
+      white-space:nowrap;
+      user-select:none;
+      pointer-events:none;
+      opacity:0;
+      transform:translate(-50%,-50%) scale(.05);
+      z-index:3;
+      text-shadow:0 1px 0 rgba(74,94,74,.18);    /* gleicher dezenter Schatten wie Header */
+      transition:filter .25s ease;
+    }
+    .cs.active{ pointer-events:auto; cursor:pointer; }
+    .cs.active:hover{ filter:brightness(1.15); }
+
+    /* Münze interaktiv */
+    .split{ pointer-events:auto; cursor:pointer; touch-action:manipulation; }
+
+    /* ---------- Dynamische Klick-Effekte (hinter Kreis und CS) ---------- */
+    .ring-fx{
+      position:fixed; top:0; left:0;
+      width:var(--fx-size, 240px); height:var(--fx-size, 240px);
+      border-radius:50%; border:3px solid var(--accent);
+      pointer-events:none; opacity:0; z-index:1;
+      animation:ringFx 1.7s ease-out forwards;
+    }
+    @keyframes ringFx{
+      0%   { transform:translate(calc(var(--cx) - 50%), calc(var(--cy) - 50%)) scale(.6);  opacity:0; }
+      12%  { opacity:.9; }
+      100% { transform:translate(calc(var(--cx) - 50%), calc(var(--cy) - 50%)) scale(2.9); opacity:0; }
+    }
+    .wave-fx{
+      position:fixed; top:0; left:0;
+      width:var(--fx-size, 240px); height:var(--fx-size, 240px);
+      border-radius:50%;
+      border:2px solid rgba(95,105,105,.32);
+      box-shadow:
+        0 0 0 3px rgba(205,215,215,.22),
+        0 0 0 6px rgba(95,105,105,.14),
+        0 0 22px 6px rgba(85,95,95,.10);
+      filter:blur(.6px);
+      pointer-events:none; opacity:0; z-index:0;
+      animation:waveFx 2.7s cubic-bezier(.2,.7,.2,1) forwards;
+    }
+    @keyframes waveFx{
+      0%   { transform:translate(calc(var(--cx) - 50%), calc(var(--cy) - 50%)) scale(.55); opacity:0; }
+      12%  { opacity:.85; }
+      55%  { opacity:.55; }
+      100% { transform:translate(calc(var(--cx) - 50%), calc(var(--cy) - 50%)) scale(6.8); opacity:0; }
+    }
+
+    /* ---------- Pixel-Canvas + Maus-Ringe ---------- */
+    #px{ position:fixed; inset:0; z-index:20; pointer-events:none; }
+    .cursor-ring{
+      position:fixed; width:18px; height:18px; margin:-9px 0 0 -9px;
+      border:1.5px solid var(--accent); border-radius:50%;
+      pointer-events:none; z-index:30;
+      animation:cursorRing .5s ease-out forwards;
+    }
+    @keyframes cursorRing{
+      0%{ transform:scale(.5); opacity:0; }
+      18%{ opacity:.9; }
+      70%{ opacity:.9; }
+      100%{ transform:scale(1.15); opacity:0; }
+    }
+
+    @media (prefers-reduced-motion: reduce){
+      .drop{ animation:none; transform:scale(1); opacity:1; filter:none; }
+      .wordmark{ animation:none; }
+      .shadow{ animation:none; opacity:1; transform:translate(-50%,-50%) scaleX(1); }
+      .ring, .wave, .ring-fx, .wave-fx{ display:none; }
+      .cs{ opacity:1; transform:translate(-50%,-50%) scale(1); }
+    }
+
+    /* ---------- Mobile-Anpassungen ---------- */
+    @media (max-width: 600px){
+      :root{ --circle-size: clamp(130px, 38vmin, 220px); }
+      .wordmark{ letter-spacing:.34em; text-indent:.34em; }
+      .cs{
+        font-size:clamp(1.4rem, 7vw, 2.4rem);
+        letter-spacing:.20em;
+        text-indent:.20em;
+      }
+      header{ padding:18px 12px; }
+      /* Cursor-Ring auf Touch-Geräten unnötig */
+    }
+    @media (hover: none){
+      .cursor-ring{ display:none; }
+    }
+    html{ -webkit-text-size-adjust:100%; }
+    body{ touch-action:manipulation; }
+  </style>
+</head>
+
+<body>
+  <header><div class="wordmark">QUIFT</div></header>
+
+  <div class="scene">
+    <span class="wave w1"></span>
+    <span class="wave w2"></span>
+    <span class="wave w3"></span>
+    <span class="wave w4"></span>
+    <span class="ring b1"></span>
+    <span class="ring b2"></span>
+    <span class="ring b3"></span>
+    <div class="shadow"></div>
+
+    <div class="cs" id="cs">Coming&nbsp;Soon</div>
+
+    <div class="split left">
+      <div class="tilt"><div class="drop"><div class="coin">
+        <div class="face front"></div><div class="face back"></div>
+      </div></div></div>
+    </div>
+    <div class="split right">
+      <div class="tilt"><div class="drop"><div class="coin">
+        <div class="face front"></div><div class="face back"></div>
+      </div></div></div>
+    </div>
+  </div>
+
+  <canvas id="px"></canvas>
+
+  <script>
+  (function(){
+    // Eingangs-Animation immer von vorn: Browser-Scroll-Wiederherstellung aus.
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    window.scrollTo(0, 0);
+
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const left   = document.querySelector('.split.left');
+    const right  = document.querySelector('.split.right');
+    const coins  = document.querySelectorAll('.coin');
+    const shadow = document.querySelector('.shadow');
+    const cs     = document.getElementById('cs');
+    const canvas = document.getElementById('px');
+    const ctx    = canvas.getContext('2d');
+
+    // Sequenz-Parameter
+    const SPINS = 3, SPIN_END = 0.5, SPLIT_END = 0.9;
+    const GRAV = 0.45, BLOCK = 13;
+
+    let radius = 0, maxX = 0, maxScroll = 0;
+    let shattered = false, particles = [], rafId = null;
+    const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+
+    function measure(){
+      const sample = document.querySelector('.coin');
+      radius = sample.offsetWidth/2;
+      maxX = Math.max(40, window.innerWidth/2 - radius);
+      maxScroll = Math.max(1, document.body.scrollHeight - window.innerHeight);
+      canvas.width  = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+
+    function onScroll(){
+      const p = clamp(window.scrollY / maxScroll, 0, 1);
+      const spinT  = clamp(p / SPIN_END, 0, 1);
+      const splitT = clamp((p - SPIN_END) / (SPLIT_END - SPIN_END), 0, 1);
+
+      // Während des Drehens: beide Hälften rotieren gemeinsam.
+      // Während des Teilens: linke Hälfte arretiert auf Rückseite (grün, 180°),
+      // rechte Hälfte arretiert auf Vorderseite (grau, 360°).
+      const baseRot = spinT * SPINS * 360;
+      const leftTarget  = Math.ceil(baseRot/360)*360 + 180;
+      const rightTarget = Math.ceil(baseRot/360)*360 + 360;
+      const leftRot  = baseRot + splitT * (leftTarget  - baseRot);
+      const rightRot = baseRot + splitT * (rightTarget - baseRot);
+      const tx = splitT * maxX;
+
+      left.querySelector('.coin').style.transform  = 'rotateY(' + leftRot  + 'deg)';
+      right.querySelector('.coin').style.transform = 'rotateY(' + rightRot + 'deg)';
+      left.style.transform  = 'translate(calc(-50% - ' + tx + 'px), -50%)';
+      right.style.transform = 'translate(calc(-50% + ' + tx + 'px), -50%)';
+      shadow.style.opacity  = String(1 - splitT);
+
+      // "Coming Soon" zoomt mit dem Auseinanderlaufen heran
+      const csScale = 0.05 + splitT * 0.95;
+      cs.style.transform = 'translate(-50%,-50%) scale(' + csScale + ')';
+      cs.style.opacity   = String(splitT);
+      cs.classList.toggle('active', splitT > 0.35);
+
+      if (splitT >= 1 && !shattered)            shatter();
+      else if (p < SPIN_END * 0.7 && shattered) resetShatter();
+    }
+
+    function shatter(){
+      shattered = true;
+      [left, right].forEach((wrap, idx) => {
+        const r = wrap.querySelector('.coin').getBoundingClientRect();
+        const cx = r.left + r.width/2, cy = r.top + r.height/2;
+        const rad = Math.min(r.width, r.height)/2;
+        const inward = (idx === 0) ? 1 : -1;          // weg von der Wand, Richtung Mitte
+        const sideColor = (idx === 0) ? '#ADFF2F' : '#838b8b';
+        for (let gx = -rad; gx <= rad; gx += BLOCK){
+          for (let gy = -rad; gy <= rad; gy += BLOCK){
+            const ddx = gx + BLOCK/2, ddy = gy + BLOCK/2;
+            if (ddx*ddx + ddy*ddy > rad*rad) continue;
+            particles.push({
+              x: cx + gx, y: cy + gy, size: BLOCK - 1,
+              vx: inward*(Math.random()*2.6 + 0.6) + (Math.random()-0.5)*1.6,
+              vy: (Math.random()*-0.6) + (Math.random()-0.3)*0.8,
+              vr: (Math.random()-0.5)*0.35, rot: Math.random()*Math.PI,
+              color: sideColor
+            });
+          }
+        }
+        wrap.style.visibility = 'hidden';
+      });
+      if (!rafId) rafId = requestAnimationFrame(tick);
+    }
+
+    function tick(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      let alive = 0;
+      for (const pt of particles){
+        pt.vy += GRAV; pt.x += pt.vx; pt.y += pt.vy; pt.rot += pt.vr;
+        if (pt.y < canvas.height + 80) alive++;
+        ctx.save();
+        ctx.translate(pt.x, pt.y); ctx.rotate(pt.rot);
+        ctx.fillStyle = pt.color;
+        ctx.fillRect(-pt.size/2, -pt.size/2, pt.size, pt.size);
+        ctx.restore();
+      }
+      if (alive > 0 && shattered) rafId = requestAnimationFrame(tick);
+      else { rafId = null; }
+    }
+
+    function resetShatter(){
+      shattered = false; particles = [];
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      left.style.visibility = right.style.visibility = 'visible';
+    }
+
+    // Maus-Trail: dünne Ringe, die 0,5 s bestehen
+    let lastX = null, lastY = null;
+    if (!reduced){
+      window.addEventListener('mousemove', (e) => {
+        if (lastX !== null){
+          const dx = e.clientX - lastX, dy = e.clientY - lastY;
+          if (dx*dx + dy*dy < 26*26) return;
+        }
+        lastX = e.clientX; lastY = e.clientY;
+        const ring = document.createElement('div');
+        ring.className = 'cursor-ring';
+        ring.style.left = e.clientX + 'px';
+        ring.style.top  = e.clientY + 'px';
+        document.body.appendChild(ring);
+        ring.addEventListener('animationend', () => ring.remove());
+      });
+    }
+
+    // Klick-Wellen: erzeugt Ring- + Wasser-Welle (wie Eingang), Größe skalierbar
+    function spawnImpact(x, y, scale){
+      if (reduced) return;
+      scale = scale || 1;
+      const baseSize = Math.round(240 * scale);
+      const mkFx = (cls, delayMs) => {
+        const el = document.createElement('span');
+        el.className = cls;
+        el.style.setProperty('--cx', x + 'px');
+        el.style.setProperty('--cy', y + 'px');
+        el.style.setProperty('--fx-size', baseSize + 'px');
+        el.style.animationDelay = delayMs + 'ms';
+        document.body.appendChild(el);
+        el.addEventListener('animationend', () => el.remove());
+      };
+      [0, 180, 360].forEach(d => mkFx('ring-fx', d));
+      [0, 150, 330, 530].forEach(d => mkFx('wave-fx', d));
+    }
+
+    // Click-Throttle für Kreis-Replay: maximal 3 Klicks pro Sekunde
+    const coinClickTimes = [];
+    function coinClickAllowed(){
+      const now = performance.now();
+      while (coinClickTimes.length && coinClickTimes[0] < now - 1000) coinClickTimes.shift();
+      if (coinClickTimes.length >= 3) return false;
+      coinClickTimes.push(now);
+      return true;
+    }
+
+    // Globaler Klick-Handler
+    document.addEventListener('click', (e) => {
+      // 1. Klick auf "Coming Soon" -> zurück zum Anfang
+      if (e.target.closest('.cs')) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      // 2. Klick auf Münze bei scroll 0 -> Eingangs-Wellen replay (max. 3/Sek.)
+      if (e.target.closest('.split') && window.scrollY < 30) {
+        if (!coinClickAllowed()) return;
+        spawnImpact(window.innerWidth / 2, window.innerHeight / 2, 1);
+        return;
+      }
+      // 3. Hintergrund-Tipp -> kleinere Welle am Klick-Punkt
+      spawnImpact(e.clientX, e.clientY, 0.42);
+    });
+
+    measure();
+    window.addEventListener('resize', () => { measure(); onScroll(); });
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  })();
+  </script>
+</body>
+</html>
